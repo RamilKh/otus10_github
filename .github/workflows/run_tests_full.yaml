@@ -1,0 +1,80 @@
+
+name: Run python full testing - pull request
+
+on: [pull_request]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:10.8
+        env:
+          POSTGRES_USER: otusds
+          POSTGRES_PASSWORD: otusds
+          POSTGRES_DB: otusds
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: 1. Setup python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+
+      - name: 2. Lint with flake8
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: 3. Install pip
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: 4. Install pipenv
+        run: |
+          pip install pipenv
+
+      - name: 5. Install dependencies
+        run: |
+          pipenv install --dev --system
+
+      - name: 6. List dependencies
+        run: |
+          pip list
+
+      - name: 7. Make migrations
+        run: |
+          cd app
+          export FLASK_APP=application.py
+          flask db upgrade
+          cd ../
+
+      - name: 8. Run pytest
+        run: |
+          pytest -s -vv
+
+      - name: 9. Run coverage
+        run: |
+          coverage run -m pytest -v
+
+      - name: 10. Report coverage
+        run: |
+          coverage report --skip-empty
+
+
+      - name: Deploy to Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.DEPLOY_SERVER_HOST }}
+          port: ${{ secrets.DEPLOY_SERVER_PORT }}
+          username: ${{ secrets.DEPLOY_SERVER_USERNAME }}
+          key: ${{ secrets.DEPLOY_SERVER_KEY }}
+          source: ${{ env.BUILD_SCRIPT_OUTPUT }}
+          target: ${{ env.DEPLOY_PATH }}
+          strip_components: 1
