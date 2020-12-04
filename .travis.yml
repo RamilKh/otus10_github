@@ -1,0 +1,25 @@
+dist: xenial
+os: linux
+language: python
+python: 3.7
+
+addons:
+  postgresql: "12"
+
+install:
+  - pipenv install --dev --system
+  - cd app
+  - export FLASK_APP=application.py
+  - flask db upgrade
+  - cd ../
+
+before_script:
+  - psql -c "CREATE DATABASE otusds;" -U postgres
+  - psql -c "CREATE USER otusds WITH PASSWORD 'otusds';" -U postgres
+  - export DJ_DEBUG=False
+
+env:
+  - DJ_DEBUG=base
+
+script:
+  - pytest -s -vv
